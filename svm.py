@@ -1,5 +1,7 @@
 # Imports:
 import numpy as np
+from sklearn.metrics.pairwise import polynomial_kernel
+from sklearn.metrics.pairwise import rbf_kernel
 
 # Definicion de los kernels:
 
@@ -21,6 +23,7 @@ def linear_kernel(x, y, b=1):
     # Calcula el kernel K, que debe ser un array n x m
     #-----------------------------------------------------------------------
     pass
+    K = polynomial_kernel(x, y, degree=1, gamma=1, coef0=1)
     
     #-----------------------------------------------------------------------
     # Fin TO-DO.
@@ -47,6 +50,7 @@ def poly_kernel(x, y, deg=1, b=1):
     # Calcula el kernel K, que debe ser un array n x m
     #-----------------------------------------------------------------------
     pass
+    K = polynomial_kernel(x, y, degree=2, gamma=1, coef0=1)
     
     #-----------------------------------------------------------------------
     # Fin TO-DO.
@@ -76,6 +80,7 @@ def rbf_kernel(x, y, sigma=1):
     # gamma = 1 / 2*sigma^2
     #-----------------------------------------------------------------------
     pass
+    K = rbf_kernel(x, y, gamma=1/(2*sigma**2))
     
     #-----------------------------------------------------------------------
     # Fin TO-DO.
@@ -133,6 +138,18 @@ class SVM:
             return poly_kernel(x, y, deg, b)
         if k == "rbf":
             return rbf_kernel(x, y, sigma)
+    #-----------------------------------------------------------------------
+    # K(self, i)
+    #   Evalua el kernel sobre los arrays x[i] e y; para todo y en X
+    # Argumentos:
+    #   i: indice del punto a evaluar
+    # Devuelve:
+    #   Array de dimensiones n x 1 donde el elemento j es igual a 
+    #   self.evaluate_kernel(self.X[j],self.X[i])
+    #-----------------------------------------------------------------------
+    def K(self, i):
+        n, d = self.X.shape
+        return [self.evaluate_kernel(self.X[j],self.X[i]) for j in range(n)] 
 
     #-----------------------------------------------------------------------
     # init_model(self, a, b, X, y)
@@ -170,7 +187,11 @@ class SVM:
         # Calcula la funcion de clasificacion f(z), debe ser un array de
         # dimension (n, 1)
         #-------------------------------------------------------------------
-        pass
+        b=np.empty(n)
+        b.fill(self.b)
+        yalpha = self.y*self.alpha
+        sumatory = [np.sum(yalpha * self.K(i)) for i in range(n)] 	
+        f = np.substract(sumatory,b)
     
         #-------------------------------------------------------------------
         # Fin TO-DO.
@@ -209,8 +230,12 @@ class SVM:
         # alpha[i] no satisface las restricciones.
         # NOTA: deberia ser facil, puede hacerse con una sola linea.
         #-------------------------------------------------------------------
-        pass
-    
+	#for i in range(n):
+	#	ix[i] = ((ye[i]< -tol)and(a[i] < C))or((ye[i] > tol)and(a[i] > 0))
+        ix = np.logical_or(np.logical_and(ye[i< -tol],a[i < C]),np.logical_and(ye[i > tol],a[i > 0]))
+
+	#ix = [((ye[i]< -tol)and(a[i] < C))or((ye[i] > tol)and(a[i] > 0)) for i in range(n)]
+	
         #-------------------------------------------------------------------
         # Fin TO-DO.
         #-------------------------------------------------------------------
@@ -225,7 +250,7 @@ class SVM:
         # Cojo como j otro al azar distinto de i:
         p = np.random.permutation(n)[:2]
         j = p[0] if p[0] != i else p[1]
-        
+
         return i, j
         
     #-----------------------------------------------------------------------
@@ -245,7 +270,8 @@ class SVM:
         # TO-DO:
         # Calcula el el valor de eta.
         #-------------------------------------------------------------------
-        pass
+        k = 2 * self.evaluate_kernel(z[1],z[2])
+        eta = self.evaluate_kernel(z[1],z[1]) + self.evaluate_kernel(z[2],z[2]) - k
     
         #-------------------------------------------------------------------
         # Fin TO-DO.
@@ -280,8 +306,22 @@ class SVM:
         # 3. Haz el clip de alpha_j para que este en el rango [L, H]
         # 4. Calcula el nuevo valor de alpha_i con la ecuacion 18
         #-------------------------------------------------------------------
-        pass
-    
+        yi = self.y[i]
+        yj = self.y[j]
+        C = self.C
+        #1
+        if yi != yj:
+                L = max(0,aj_old-ai_old)
+                H = min(C,C+aj_old-ai_old)
+        else:
+                L = max(0,aj_old+ai_old-C)
+                H = min(C,aj_old+ai_old)
+        #2
+        self.alpha[j] = aj_old + ((yj*(e[i]-e[j]))/eta)
+        #3
+        self.alpha[j] = max(min(H,self.alpha[j]),L)
+        #4
+        self.alpha[i] = self.alpha[i] + yi*yj*(aj_old - self.alpha[j])
         #-------------------------------------------------------------------
         # Fin TO-DO.
         #-------------------------------------------------------------------
@@ -310,8 +350,24 @@ class SVM:
         # Actualiza el bias de acuerdo a las ecuaciones 20 y 21 del articulo
         # de Platt, 1998
         #-------------------------------------------------------------------
-        pass
-    
+        b = self.b
+        ai = self.alpha[i]
+        aj = self.alpha[j]
+        yi = self.y[i]
+        yj = self.y[j]
+        Xi = self.X[i]
+        Xj = self.X[j]
+        C = self.C
+        if ((0 < ai)and(ai < C)):
+           self.b = b + e[i] - yi*(ai-ai_old)*self.evaluate_kernel(Xi,Xi) - yj*(aj-aj_old)*self.evaluate_kernel(Xi,Xj)
+        elif ((0 < aj)and(aj < C)):
+           self.b = b + e[j] - yi*(ai-ai_old)*self.evaluate_kernel(Xi,Xj) - yj*(aj-aj_old)*self.evaluate_kernel(Xj,Xj)
+        else:
+           b1 = b + e[i] - yi*(ai-ai_old)*self.evaluate_kernel(Xi,Xi) - yj*(aj-aj_old)*self.evaluate_kernel(Xi,Xj)
+           b2 = b + e[j] - yi*(ai-ai_old)*self.evaluate_kernel(Xi,Xj) - yj*(aj-aj_old)*self.evaluate_kernel(Xj,Xj) 
+           self.b = (b1 +b2)/2
+
+	    
         #-------------------------------------------------------------------
         # Fin TO-DO.
         #-------------------------------------------------------------------
