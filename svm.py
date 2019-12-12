@@ -1,7 +1,7 @@
 # Imports:
 import numpy as np
 from sklearn.metrics.pairwise import polynomial_kernel
-from sklearn.metrics.pairwise import rbf_kernel
+from sklearn.metrics.pairwise import rbf_kernel as RB
 
 # Definicion de los kernels:
 
@@ -80,7 +80,8 @@ def rbf_kernel(x, y, sigma=1):
     # gamma = 1 / 2*sigma^2
     #-----------------------------------------------------------------------
     pass
-    K = rbf_kernel(x, y, gamma=1/(2*sigma**2))
+    
+    K = RB(x, y,gamma=0.5)
     
     #-----------------------------------------------------------------------
     # Fin TO-DO.
@@ -145,12 +146,11 @@ class SVM:
     #   i: indice del punto a evaluar
     # Devuelve:
     #   Array de dimensiones n x 1 donde el elemento j es igual a 
-    #   self.evaluate_kernel(self.X[j],self.X[i])
+    #   self.evaluate_kernel(self.X,self.X)[j][i]
     #-----------------------------------------------------------------------
     def K(self, i):
-        n, d = self.X.shape
-        return [self.evaluate_kernel(self.X[j],self.X[i]) for j in range(n)] 
-
+        return self.evaluate_kernel(self.X,self.X)[i]
+        
     #-----------------------------------------------------------------------
     # init_model(self, a, b, X, y)
     #   Inicializa las alphas y el b del modelo a los valores pasados como
@@ -191,7 +191,7 @@ class SVM:
         b.fill(self.b)
         yalpha = self.y*self.alpha
         sumatory = [np.sum(yalpha * self.K(i)) for i in range(n)] 	
-        f = np.substract(sumatory,b)
+        f = np.subtract(sumatory,b)
     
         #-------------------------------------------------------------------
         # Fin TO-DO.
@@ -232,8 +232,18 @@ class SVM:
         #-------------------------------------------------------------------
 	#for i in range(n):
 	#	ix[i] = ((ye[i]< -tol)and(a[i] < C))or((ye[i] > tol)and(a[i] > 0))
-        ix = np.logical_or(np.logical_and(ye[i< -tol],a[i < C]),np.logical_and(ye[i > tol],a[i > 0]))
-
+        #print(self.alpha)
+        print("ye := " , ye)
+        print("alpha:= " , a)
+        print("b:= ",self.b)
+        print("ye < -tol := ", ye < -tol)
+        print("alpha < C := ", a < C)
+        print("ye > tol := ",ye > tol)
+        print("alpha > 0 := ",a > 0)
+        print("...")
+        ix = np.logical_or(np.logical_and(ye < -tol,a < C),np.logical_and(ye > tol,a > 0))
+        print("Not KKT :=", ix)
+        print(" ")
 	#ix = [((ye[i]< -tol)and(a[i] < C))or((ye[i] > tol)and(a[i] > 0)) for i in range(n)]
 	
         #-------------------------------------------------------------------
@@ -270,8 +280,8 @@ class SVM:
         # TO-DO:
         # Calcula el el valor de eta.
         #-------------------------------------------------------------------
-        k = 2 * self.evaluate_kernel(z[1],z[2])
-        eta = self.evaluate_kernel(z[1],z[1]) + self.evaluate_kernel(z[2],z[2]) - k
+        k = self.evaluate_kernel(z,z)
+        eta = k[1][1] + k[0][0] - 2*k[1][0]
     
         #-------------------------------------------------------------------
         # Fin TO-DO.
@@ -329,6 +339,7 @@ class SVM:
         self.is_sv[i] = self.alpha[i] > 0
         self.is_sv[j] = self.alpha[j] > 0
         self.num_sv = np.sum(self.is_sv)
+        #print(self.is_sv)
         
         return ai_old, aj_old
 
@@ -355,16 +366,16 @@ class SVM:
         aj = self.alpha[j]
         yi = self.y[i]
         yj = self.y[j]
-        Xi = self.X[i]
-        Xj = self.X[j]
+        X = np.vstack((self.X[i],self.X[j]))
+        K = self.evaluate_kernel(X,X)
         C = self.C
         if ((0 < ai)and(ai < C)):
-           self.b = b + e[i] - yi*(ai-ai_old)*self.evaluate_kernel(Xi,Xi) - yj*(aj-aj_old)*self.evaluate_kernel(Xi,Xj)
+           self.b = b + e[i] + yi*(ai-ai_old)*K[0][0] + yj*(aj-aj_old)*K[0][1]
         elif ((0 < aj)and(aj < C)):
-           self.b = b + e[j] - yi*(ai-ai_old)*self.evaluate_kernel(Xi,Xj) - yj*(aj-aj_old)*self.evaluate_kernel(Xj,Xj)
+           self.b = b + e[j] + yi*(ai-ai_old)*K[0][1] + yj*(aj-aj_old)*K[1][1]
         else:
-           b1 = b + e[i] - yi*(ai-ai_old)*self.evaluate_kernel(Xi,Xi) - yj*(aj-aj_old)*self.evaluate_kernel(Xi,Xj)
-           b2 = b + e[j] - yi*(ai-ai_old)*self.evaluate_kernel(Xi,Xj) - yj*(aj-aj_old)*self.evaluate_kernel(Xj,Xj) 
+           b1 = b + e[i] + yi*(ai-ai_old)*K[0][0] + yj*(aj-aj_old)*K[0][1]
+           b2 = b + e[j] + yi*(ai-ai_old)*K[0][1] + yj*(aj-aj_old)*K[1][1] 
            self.b = (b1 +b2)/2
 
 	    
@@ -402,6 +413,7 @@ class SVM:
             
             # Seleccionamos pareja de alphas para optimizar:
             i, j = self.select_alphas(e, tol)
+            #i, j = self.select_alphas(e, 50*tol)
 
             # Si todas las alphas satisfacen las restricciones, acabamos:
             if i == -1:
@@ -412,6 +424,7 @@ class SVM:
 
             # Si eta es negativa o cero ignoramos esta pareja de alphas:
             if eta <= 0: 
+                print("eta = ",eta)
                 continue
            
             # Actualizamos las alphas:
@@ -420,6 +433,7 @@ class SVM:
             # Si no ha habido cambio importante en las alphas, continuamos 
             # sin actualizar el bias:
             if abs(self.alpha[j] - aj_old) < tol:
+                print("change in aplha = ",self.alpha[j] - aj_old)
                 continue
                             
             # Actualizamos el bias:
