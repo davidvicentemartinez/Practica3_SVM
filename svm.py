@@ -16,19 +16,9 @@ from sklearn.metrics.pairwise import rbf_kernel as RB
 #   Array k de dimensiones n x m, con kij = k(x[i], y[j])
 #---------------------------------------------------------------------------
 def linear_kernel(x, y, b=1):
-    K = None
-
-    #-----------------------------------------------------------------------
-    # TO-DO:
-    # Calcula el kernel K, que debe ser un array n x m
-    #-----------------------------------------------------------------------
-    pass
-    K = polynomial_kernel(x, y, degree=1, gamma=1, coef0=1)
-    
-    #-----------------------------------------------------------------------
-    # Fin TO-DO.
-    #-----------------------------------------------------------------------
-    
+    K = np.dot(x, y.transpose())
+    n = K.size
+    K = K + b*np.ones(K.shape)
     return K
 
 #---------------------------------------------------------------------------
@@ -43,19 +33,10 @@ def linear_kernel(x, y, b=1):
 #   Array K de dimensiones n x m, con Kij = k(x[i], y[j])
 #---------------------------------------------------------------------------
 def poly_kernel(x, y, deg=1, b=1):
-    K = None
-
-    #-----------------------------------------------------------------------
-    # TO-DO:
-    # Calcula el kernel K, que debe ser un array n x m
-    #-----------------------------------------------------------------------
-    pass
-    K = polynomial_kernel(x, y, degree=2, gamma=1, coef0=1)
-    
-    #-----------------------------------------------------------------------
-    # Fin TO-DO.
-    #-----------------------------------------------------------------------
-    
+    K = np.dot(x, y.transpose())
+    n = K.size
+    K = K + b*np.ones(K.shape)
+    K = np.matrix_power(np.asmatrix(K),deg)
     return K
 
 
