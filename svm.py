@@ -18,7 +18,9 @@ from sklearn.metrics.pairwise import rbf_kernel as RB
 def linear_kernel(x, y, b=1):
     K = np.dot(x, y.transpose())
     n = K.size
-    K = K + b*np.ones(K.shape)
+    B=np.empty(K.shape)
+    B.fill(b)
+    K = K + B
     return K
 
 #---------------------------------------------------------------------------
@@ -35,8 +37,10 @@ def linear_kernel(x, y, b=1):
 def poly_kernel(x, y, deg=1, b=1):
     K = np.dot(x, y.transpose())
     n = K.size
-    K = K + b*np.ones(K.shape)
-    K = np.matrix_power(np.asmatrix(K),deg)
+    B=np.empty(K.shape)
+    B.fill(b)
+    K = K + B
+    K = np.power(K,deg)
     return K
 
 
@@ -60,9 +64,16 @@ def rbf_kernel(x, y, sigma=1):
     # que usan las funciones de sklearn se relacionan segun la expresion
     # gamma = 1 / 2*sigma^2
     #-----------------------------------------------------------------------
-    pass
-    
-    K = RB(x, y,gamma=0.5)
+    g = (-2*(sigma**2))
+    n , d1 = x.shape
+    m , d2 = y.shape
+    a = np.full(n,m,dtype='int64')
+    K = np.repeat(x,a,axis=0) - np.tile(y,(n,1))
+    K = np.linalg.norm(K,axis=1)
+    K = np.power(K,2)
+    K = np.divide(K,g)
+    K = np.exp(K)
+    K = np.reshape(K,(n,m))
     
     #-----------------------------------------------------------------------
     # Fin TO-DO.
@@ -120,17 +131,6 @@ class SVM:
             return poly_kernel(x, y, deg, b)
         if k == "rbf":
             return rbf_kernel(x, y, sigma)
-    #-----------------------------------------------------------------------
-    # K(self, i)
-    #   Evalua el kernel sobre los arrays x[i] e y; para todo y en X
-    # Argumentos:
-    #   i: indice del punto a evaluar
-    # Devuelve:
-    #   Array de dimensiones n x 1 donde el elemento j es igual a 
-    #   self.evaluate_kernel(self.X,self.X)[j][i]
-    #-----------------------------------------------------------------------
-    def K(self, i):
-        return self.evaluate_kernel(self.X,self.X)[i]
         
     #-----------------------------------------------------------------------
     # init_model(self, a, b, X, y)
@@ -171,7 +171,10 @@ class SVM:
         b=np.empty(n)
         b.fill(self.b)
         yalpha = self.y*self.alpha
-        sumatory = [np.sum(yalpha * self.K(i)) for i in range(n)] 	
+        K = self.evaluate_kernel(z,z)
+        YA = np.tile(yalpha,(n,1))
+        F1 = np.multiply(K,YA)
+        sumatory = np.sum(F1, axis= 1)	
         f = np.subtract(sumatory,b)
     
         #-------------------------------------------------------------------
@@ -211,22 +214,9 @@ class SVM:
         # alpha[i] no satisface las restricciones.
         # NOTA: deberia ser facil, puede hacerse con una sola linea.
         #-------------------------------------------------------------------
-	#for i in range(n):
-	#	ix[i] = ((ye[i]< -tol)and(a[i] < C))or((ye[i] > tol)and(a[i] > 0))
-        #print(self.alpha)
-        print("ye := " , ye)
-        print("alpha:= " , a)
-        print("b:= ",self.b)
-        print("ye < -tol := ", ye < -tol)
-        print("alpha < C := ", a < C)
-        print("ye > tol := ",ye > tol)
-        print("alpha > 0 := ",a > 0)
-        print("...")
-        ix = np.logical_or(np.logical_and(ye < -tol,a < C),np.logical_and(ye > tol,a > 0))
-        print("Not KKT :=", ix)
-        print(" ")
-	#ix = [((ye[i]< -tol)and(a[i] < C))or((ye[i] > tol)and(a[i] > 0)) for i in range(n)]
 	
+        ix = np.logical_or(np.logical_and(ye < -tol,a < C),np.logical_and(ye > tol,a > 0))
+        
         #-------------------------------------------------------------------
         # Fin TO-DO.
         #-------------------------------------------------------------------
@@ -405,7 +395,6 @@ class SVM:
 
             # Si eta es negativa o cero ignoramos esta pareja de alphas:
             if eta <= 0: 
-                print("eta = ",eta)
                 continue
            
             # Actualizamos las alphas:
@@ -414,7 +403,6 @@ class SVM:
             # Si no ha habido cambio importante en las alphas, continuamos 
             # sin actualizar el bias:
             if abs(self.alpha[j] - aj_old) < tol:
-                print("change in aplha = ",self.alpha[j] - aj_old)
                 continue
                             
             # Actualizamos el bias:
