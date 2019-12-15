@@ -1,7 +1,6 @@
 # Imports:
 import numpy as np
-from sklearn.metrics.pairwise import polynomial_kernel
-from sklearn.metrics.pairwise import rbf_kernel as RB
+import timeit
 
 # Definicion de los kernels:
 
@@ -54,7 +53,40 @@ def poly_kernel(x, y, deg=1, b=1):
 # Devuelve:
 #   Array K de dimensiones n x m, con Kij = k(x[i], y[j])
 #---------------------------------------------------------------------------
+
 def rbf_kernel(x, y, sigma=1):
+    K = None
+
+    #-----------------------------------------------------------------------
+    # TO-DO:
+    # Calcula el kernel K, que debe ser un array n x m
+    # Nota: el parametro sigma usado en esta funcion y el parametro gamma
+    # que usan las funciones de sklearn se relacionan segun la expresion
+    # gamma = 1 / 2*sigma^2
+    #-----------------------------------------------------------------------
+    g = (-2*(sigma**2))
+    n , d1 = x.shape
+    m , d2 = y.shape
+    nX= np.linalg.norm(x,axis=1)
+    nX = np.power(nX,2)
+    nY= np.linalg.norm(y,axis=1)
+    nY = np.power(nY,2)
+    XY = np.dot(x,np.transpose(y))
+    a = np.full(n,m,dtype='int64')
+    X = np.repeat(nX,a,axis=0).reshape(n,m)
+    Y = np.tile(nY,(n,1))
+    K = X+Y-(2*XY)
+    K = np.divide(K,g)
+    K = np.exp(K)
+    K = np.reshape(K,(n,m))
+    
+    #-----------------------------------------------------------------------
+    # Fin TO-DO.
+    #-----------------------------------------------------------------------
+    
+    return K
+
+def rbf_kernel_for_really_small_cases(x, y, sigma=1):
     K = None
 
     #-----------------------------------------------------------------------
@@ -384,7 +416,6 @@ class SVM:
             
             # Seleccionamos pareja de alphas para optimizar:
             i, j = self.select_alphas(e, tol)
-            #i, j = self.select_alphas(e, 50*tol)
 
             # Si todas las alphas satisfacen las restricciones, acabamos:
             if i == -1:
