@@ -1,6 +1,5 @@
 # Imports:
 import numpy as np
-import timeit
 
 # Definicion de los kernels:
 
@@ -15,11 +14,21 @@ import timeit
 #   Array k de dimensiones n x m, con kij = k(x[i], y[j])
 #---------------------------------------------------------------------------
 def linear_kernel(x, y, b=1):
+    K = None
+
+    #-----------------------------------------------------------------------
+    # TO-DO:
+    # Calcula el kernel K, que debe ser un array n x m
+    #-----------------------------------------------------------------------
     K = np.dot(x, y.transpose())
     n = K.size
     B=np.empty(K.shape)
     B.fill(b)
     K = K + B
+    #-----------------------------------------------------------------------
+    # Fin TO-DO.
+    #-----------------------------------------------------------------------
+    
     return K
 
 #---------------------------------------------------------------------------
@@ -34,12 +43,22 @@ def linear_kernel(x, y, b=1):
 #   Array K de dimensiones n x m, con Kij = k(x[i], y[j])
 #---------------------------------------------------------------------------
 def poly_kernel(x, y, deg=1, b=1):
+    K = None
+
+    #-----------------------------------------------------------------------
+    # TO-DO:
+    # Calcula el kernel K, que debe ser un array n x m
+    #-----------------------------------------------------------------------
     K = np.dot(x, y.transpose())
     n = K.size
     B=np.empty(K.shape)
     B.fill(b)
     K = K + B
     K = np.power(K,deg)
+    #-----------------------------------------------------------------------
+    # Fin TO-DO.
+    #-----------------------------------------------------------------------
+    
     return K
 
 
@@ -53,7 +72,6 @@ def poly_kernel(x, y, deg=1, b=1):
 # Devuelve:
 #   Array K de dimensiones n x m, con Kij = k(x[i], y[j])
 #---------------------------------------------------------------------------
-
 def rbf_kernel(x, y, sigma=1):
     K = None
 
@@ -79,7 +97,7 @@ def rbf_kernel(x, y, sigma=1):
     K = np.divide(K,g)
     K = np.exp(K)
     K = np.reshape(K,(n,m))
-    
+
     #-----------------------------------------------------------------------
     # Fin TO-DO.
     #-----------------------------------------------------------------------
@@ -163,7 +181,7 @@ class SVM:
             return poly_kernel(x, y, deg, b)
         if k == "rbf":
             return rbf_kernel(x, y, sigma)
-        
+
     #-----------------------------------------------------------------------
     # init_model(self, a, b, X, y)
     #   Inicializa las alphas y el b del modelo a los valores pasados como
@@ -246,26 +264,27 @@ class SVM:
         # alpha[i] no satisface las restricciones.
         # NOTA: deberia ser facil, puede hacerse con una sola linea.
         #-------------------------------------------------------------------
-	
-        ix = np.logical_or(np.logical_and(ye < -tol,a < C),np.logical_and(ye > tol,a > 0))
-        
+        passix = np.logical_or(np.logical_and(ye < -tol,a < C),np.logical_and(ye > tol,a > 0))
         #-------------------------------------------------------------------
         # Fin TO-DO.
         #-------------------------------------------------------------------
 
         # Si todas las alphas satisfacen las restricciones, devuelvo i = j = -1:
-        if np.sum(ix) == 0:
+        num_valid = np.sum(ix)
+        if num_valid == 0:
             return -1, -1
 
-        # Cojo como i el indice de la primera que no satisface las restricciones:
-        i = (ix*range(n))[ix][0]
-        
+        # Cojo como i un indice al azar entre los que no satisfacen las restricciones:
+        ix_valid = np.argwhere(ix).ravel()
+        p = np.random.permutation(ix_valid)
+        i = p[0]
+
         # Cojo como j otro al azar distinto de i:
         p = np.random.permutation(n)[:2]
         j = p[0] if p[0] != i else p[1]
-
-        return i, j
         
+        return i, j
+
     #-----------------------------------------------------------------------
     # calculate_eta(self, z)
     #   Calcula el numero eta (denominador) que aparece en el algoritmo SMO.
@@ -335,6 +354,7 @@ class SVM:
         self.alpha[j] = max(min(H,self.alpha[j]),L)
         #4
         self.alpha[i] = self.alpha[i] + yi*yj*(aj_old - self.alpha[j])
+    
         #-------------------------------------------------------------------
         # Fin TO-DO.
         #-------------------------------------------------------------------
@@ -342,7 +362,6 @@ class SVM:
         self.is_sv[i] = self.alpha[i] > 0
         self.is_sv[j] = self.alpha[j] > 0
         self.num_sv = np.sum(self.is_sv)
-        #print(self.is_sv)
         
         return ai_old, aj_old
 
@@ -381,7 +400,6 @@ class SVM:
            b2 = b + e[j] + yi*(ai-ai_old)*K[0][1] + yj*(aj-aj_old)*K[1][1] 
            self.b = (b1 +b2)/2
 
-	    
         #-------------------------------------------------------------------
         # Fin TO-DO.
         #-------------------------------------------------------------------
@@ -401,21 +419,23 @@ class SVM:
     #   print_every: entero que indica cada cuantas iteraciones se muestra
     #                informacion
     #-----------------------------------------------------------------------
-    def simple_smo(self, X, y, tol=0.00001, maxiter=10, verb=False, print_every=1):
+    def simple_smo(self, X, y, tol=0.00001, maxiter=10, maxtries=2000, verb=False, print_every=1):
         n, d = X.shape
         num_iters = 0
         
         # Inicializamos el modelo con las alphas y el bias a 0:
         self.init_model(np.zeros(n), 0, X, y)
         
-        # Iteramos hasta maxiter:
-        while num_iters < maxiter:
+        # Iteramos hasta maxiter o maxtries:
+        num_tries = 0 
+        while num_iters < maxiter and num_tries < maxtries:
             # Calculamos los errores:
             f = self.evaluate_model(X)
             e = f - y
             
             # Seleccionamos pareja de alphas para optimizar:
             i, j = self.select_alphas(e, tol)
+            num_tries += 1
 
             # Si todas las alphas satisfacen las restricciones, acabamos:
             if i == -1:
@@ -433,7 +453,7 @@ class SVM:
 
             # Si no ha habido cambio importante en las alphas, continuamos 
             # sin actualizar el bias:
-            if abs(self.alpha[j] - aj_old) < tol:
+            if abs(self.alpha[j] - aj_old) < 1.e-20:
                 continue
                             
             # Actualizamos el bias:
@@ -443,5 +463,4 @@ class SVM:
             if verb and num_iters%print_every == 0:
                 print("Iteration (%d / %d), num. sv: %d" % (num_iters, maxiter, self.num_sv))
             num_iters += 1
-            
-
+            num_tries = 0
